@@ -1966,6 +1966,41 @@ relationships accept primary key values. For example, if ``e1`` and ``e2`` are
     a.entry_set.set([e1, e2])
     a.entry_set.set([e1.pk, e2.pk])
 
+Filters on RelatedManager
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When calling ``filter()`` on a
+:class:`~django.db.models.fields.related.RelatedManager`, be aware that the
+first method call is "sticky". Consider the following example:
+
+.. code-block:: pycon
+
+    >>> e1 = Entry.objects.get(headline="Best Albums of 2008")
+    >>> e2 = Entry.objects.get(headline="Lennon Would Have Loved Hip Hop")
+
+    >>> yoko = Author.objects.create(name="Yoko Ono")
+    >>> taylor = Author.objects.create(name="Taylor Swift")
+
+    >>> e1.authors.add(taylor)
+    >>> e2.authors.add(yoko, taylor)
+
+    >>> yoko.entry_set.filter(authors=taylor)
+    <QuerySet []>
+
+Since the filter condition traverses the many-to-many relationship between
+``Entry`` and ``Author``, the "entry" table is joined against the intermediary
+table "entry_authors". On the first ``filter()`` call, this join is performed
+only once. This means that it is impossible for one table row to refer to both
+authors, *yoko* and *taylor*. So although e2 fulfills the query condition, you
+get an empty ``QuerySet``. You can circumvent this behavior by chaining two
+consecutive ``filter()`` calls, resulting in two separate joins between "entry"
+and "entry_authors".
+
+.. code-block:: pycon
+
+    >>> yoko.entry_set.filter().filter(authors=taylor)
+    <QuerySet [<Entry: Lennon Would Have Loved Hip Hop>]>
+
 One-to-one relationships
 ------------------------
 
